@@ -37,10 +37,11 @@ threading.excepthook = custom_excepthook
 
 
 class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        blocklist = last_blocklist
+    protocol_version = "HTTP/1.1"
 
-        self.send_response(200)
+    def _send_headers(self, blocklist: bytes):
+        self.send_header("Server", self.version_string())
+        self.send_header("Date", self.date_time_string())
         self.send_header(
             "Content-Type", "application/gzip" if compressed else "text/plain"
         )
@@ -58,6 +59,21 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
         )
         self.send_header("Content-Length", str(len(blocklist)))
         self.end_headers()
+
+    def do_HEAD(self):
+        """
+        Implement HEAD method that can be used for healthchecks.
+        These requests won't be logged.
+        """
+        self.send_response_only(200)
+        self._send_headers(last_blocklist)
+
+    def do_GET(self):
+        blocklist = last_blocklist
+
+        self.log_request(200, len(blocklist))
+        self.send_response_only(200)
+        self._send_headers(blocklist)
 
         self.wfile.write(blocklist)
 
