@@ -2,10 +2,12 @@ import argparse
 import datetime
 import email.utils
 import http.server
+import io
 import ipaddress
 import logging
 import gzip
 import os
+import shutil
 import sys
 import threading
 import time
@@ -76,7 +78,7 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_response_only(200)
         self._send_headers(blocklist)
 
-        self.wfile.write(blocklist)
+        shutil.copyfileobj(io.BytesIO(blocklist), self.wfile)
 
     @classmethod
     def serve(cls, host: str, port: int) -> typing.NoReturn:
