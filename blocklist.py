@@ -19,7 +19,7 @@ compressed: bool = None
 last_blocklist: bytes = None
 last_update_time: datetime.datetime = None
 next_update_time: datetime.datetime = None
-etag: bytes = None
+etag: str = None
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -58,6 +58,7 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
             f"max-age={int(next_update_secs.total_seconds())+10}",
         )
         self.send_header("Content-Length", str(len(blocklist)))
+        self.send_header("ETag", etag)
         self.end_headers()
 
     def do_HEAD(self):
@@ -116,7 +117,7 @@ def generate_blacklist(args: argparse.Namespace) -> None:
 
     last_blocklist = output
     last_update_time = datetime.datetime.now()
-    etag = hex(hash(last_update_time))
+    etag = f'"{hex(hash(last_update_time))}"'
 
     logger.info("Finished generating blocklist")
 
