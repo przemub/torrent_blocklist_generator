@@ -74,12 +74,6 @@ def generate_blacklist(args: argparse.Namespace) -> None:
     logger.info("Started generating blocklist")
     output = b""
 
-    for url in args.gzip_url or []:
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            f = gzip.open(r.raw, mode="r")
-            output += f.read()
-
     for country in args.country or []:
         r = requests.get(
             f"http://www.ipdeny.com/ipblocks/data/countries/{country.alpha2.lower()}.zone"
@@ -92,6 +86,17 @@ def generate_blacklist(args: argparse.Namespace) -> None:
     compressed = not args.no_compress
     if args.no_compress is False:
         output = gzip.compress(output)
+
+    for url in args.gzip_url or []:
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            if args.no_compress:
+                # Decompress
+                f = gzip.open(r.raw, mode="r")
+                output += f.read()
+            else:
+                # Append directly
+                output += r.raw.read()
 
     last_blocklist = output
     last_update_time = datetime.datetime.now()
