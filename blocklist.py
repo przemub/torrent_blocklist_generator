@@ -17,6 +17,7 @@ import iso3166
 import requests
 
 # Variables shared between threads
+global_lock = threading.Lock()
 compressed: bool = None
 last_blocklist: bytes = None
 last_update_time: datetime.datetime = None
@@ -41,7 +42,7 @@ threading.excepthook = custom_excepthook
 class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def _send_headers(self, blocklist: bytes):
+    def _send_headers(self):
         self.send_header("Server", self.version_string())
         self.send_header("Date", self.date_time_string())
         self.send_header(
@@ -59,7 +60,7 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
             "Cache-Control",
             f"max-age={int(next_update_secs.total_seconds())+10}",
         )
-        self.send_header("Content-Length", str(len(blocklist)))
+        self.send_header("Content-Length", str(len(last_blocklist)))
         self.send_header("ETag", etag)
         self.end_headers()
 
@@ -69,7 +70,8 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
         These requests won't be logged.
         """
         self.send_response_only(200)
-        self._send_headers(last_blocklist)
+        with global_lock:
+            self._send_headers()
 
     def do_GET(self):
         blocklist = last_blocklist
@@ -78,7 +80,11 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_response_only(200)
         self._send_headers(blocklist)
 
-        shutil.copyfileobj(io.BytesIO(blocklist), self.wfile)
+        with global_lock:
+            self.log_request(200, len(last_blocklist))
+            self.send_response_only(200)
+            self._send_headers()
+            shutil.copyfileobj(io.BytesIO(last_blocklist), self.wfile)
 
     @classmethod
     def serve(cls, host: str, port: int) -> typing.NoReturn:
@@ -132,7 +138,8 @@ def update_loop(args: argparse.Namespace):
         time.sleep(86400)
 
         logger.info("Starting update")
-        generate_blacklist(args)
+        with global_lock:
+            generate_blacklist(args)
         logger.info("Finished update")
 
 
