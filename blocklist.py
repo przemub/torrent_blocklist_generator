@@ -69,16 +69,18 @@ class HttpRequestHandler(http.server.BaseHTTPRequestHandler):
         Implement HEAD method that can be used for healthchecks.
         These requests won't be logged.
         """
+        if self.path != "/":
+            self.send_error(404)
+            return
+
         self.send_response_only(200)
         with global_lock:
             self._send_headers()
 
     def do_GET(self):
-        blocklist = last_blocklist
-
-        self.log_request(200, len(blocklist))
-        self.send_response_only(200)
-        self._send_headers(blocklist)
+        if self.path != "/":
+            self.send_error(404)
+            return
 
         with global_lock:
             self.log_request(200, len(last_blocklist))
